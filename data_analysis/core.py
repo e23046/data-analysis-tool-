@@ -223,29 +223,72 @@ class DataInspector:
     # CLEANING
     # ------------------------------------------------------------------
 
-    def handle_missing_values(self, columns=None, strategy: str = "median", fill_value=None):
+    def handle_missing_values(self, strategy: str = "median", columns: Optional[List[str]] = None) -> None:
         """
-        Fills missing values using one of: 'mean', 'median', 'mode', or 'constant'.
-        If no columns are specified, all columns with missing values are targeted.
+        Safely imputes missing records using median, mean, mode, or drops missing records.
         """
         if self.df is None:
-            print("No data loaded yet.")
+            print("❌ No dataset loaded yet.")
             return
 
-        targets = columns or self.df.columns[self.df.isnull().any()].tolist()
+        # Fallback to all columns if none specified
+        target_cols = columns if columns else list(self.df.columns)
+        
+        for col in target_cols:
+            if col not in self.df.columns:
+                print(f"⚠️ Warning: Column '{col}' not found in dataset. Skipping.")
+                continue
+                
+            null_count = self.df[col].isnull().sum()
+            if null_count == 0:
+                continue
 
-        for col in targets:
-            is_numeric = pd.api.types.is_numeric_dtype(self.df[col])
-            if strategy == "mean" and is_numeric:
+            if strategy == "drop":
+                self.df = self.df.dropna(subset=[col])
+            elif strategy == "mean" and pd.api.types.is_numeric_dtype(self.df[col]):
                 self.df[col] = self.df[col].fillna(self.df[col].mean())
-            elif strategy == "median" and is_numeric:
+            elif strategy == "median" and pd.api.types.is_numeric_dtype(self.df[col]):
                 self.df[col] = self.df[col].fillna(self.df[col].median())
             elif strategy == "mode":
-                self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
-            elif strategy == "constant":
-                self.df[col] = self.df[col].fillna(fill_value)
+                mode_val = self.df[col].mode()
+                if not mode_val.empty:
+                    self.df[col] = self.df[col].fillna(mode_val[0])
+                    
+        print(f"✅ Handled missing values using '{strategy}' strategy for columns: {target_cols}")
 
-        print(f"Missing values filled using '{strategy}' for: {targets}")
+    def handle_outliers(self, find_and_delete: bool = True, strategy: str = "remove", columns: Optional[List[str]] = None) -> None:
+        """
+        Filters distribution outliers using robust Interquartile Range (IQR) criteria rules.
+        Supports both 'find_and_delete=True' and standard 'strategy' parameters.
+        """
+        if self.df is None:
+            print("❌ No dataset loaded yet.")
+            return
+
+        target_cols = columns if columns else list(self.df.select_dtypes(include=[np.number]).columns)
+        initial_shape = self.df.shape
+        
+        # Eliminate 'count' column if your package creates it automatically
+        target_cols = [c for c in target_cols if c != "count"]
+
+        for col in target_cols:
+            if col not in self.df.columns:
+                print(f"⚠️ Warning: Column '{col}' not found for outlier detection. Skipping.")
+                continue
+            if not pd.api.types.is_numeric_dtype(self.df[col]):
+                continue
+                
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Execute filtration if strategy demands removal or find_and_delete is raised
+            if strategy == "remove" or find_and_delete:
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+                
+        print(f"✅ Outliers processed. Rows before: {initial_shape[0]} -> Rows after: {self.df.shape[0]}")
 
     def remove_duplicates(self):
         """Drops exact duplicate rows and resets the index."""
@@ -257,43 +300,7 @@ class DataInspector:
         self.df = self.df.drop_duplicates().reset_index(drop=True)
         print(f"Removed {before - len(self.df)} duplicate rows. Remaining: {len(self.df)}")
 
-    def handle_outliers(self, columns=None, find_and_delete: bool = False):
-        """
-        Detects outliers using the IQR method.
-        Set find_and_delete=True to remove the flagged rows from the dataset.
-        """
-        if self.df is None:
-            print("No data loaded yet.")
-            return
-
-        targets = columns or [
-            c for c in self.df.select_dtypes(include=["number"]).columns if c != "count"
-        ]
-        flagged = set()
-
-        print("\n--- Outlier Report (IQR) ---")
-        for col in targets:
-            q1, q3 = self.df[col].quantile(0.25), self.df[col].quantile(0.75)
-            iqr = q3 - q1
-            low, high = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-            bad = self.df[(self.df[col] < low) | (self.df[col] > high)]
-            if not bad.empty:
-                flagged.update(bad.index)
-                print(f"  {col}: {len(bad)} outliers  (bounds: [{low:.2f}, {high:.2f}])")
-
-        print(f"Total unique rows flagged: {len(flagged)}")
-
-        if flagged:
-            from IPython.display import display
-            print("Preview (up to 10 rows):")
-            display(self.df.loc[list(flagged)].head(10))
-
-            if find_and_delete:
-                before = len(self.df)
-                self.df = self.df.drop(index=list(flagged)).reset_index(drop=True)
-                print(f"Deleted {len(flagged)} rows. Dataset now has {len(self.df)} rows.")
-        else:
-            print("No outliers found.")
+    
 
     def delete_rows(self, indices: Optional[List[int]] = None):
         """
