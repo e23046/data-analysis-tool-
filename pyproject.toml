@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "data-analysis"
+version = "1.0.0"
+description = "A toolkit for data cleaning, EDA, feature engineering, and interactive visualisation."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "E/23/034" }
+]
+requires-python = ">=3.9"
+
+keywords = [
+    "data analysis",
+    "EDA",
+    "data cleaning",
+    "visualisation",
+    "plotly",
+    "feature engineering",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+dependencies = [
+    "pandas>=1.5",
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "scikit-learn>=1.2",
+    "plotly>=5.13",
+    "networkx>=3.0",
+    "statsmodels>=0.14",
+    "ipython>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+    "black",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/mr-zero-000/Data-Analyze-Tool"
+Repository = "https://github.com/mr-zero-000/Data-Analyze-Tool"
+Issues = "https://github.com/mr-zero-000/Data-Analyze-Tool/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["data_analysis*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
