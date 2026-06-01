@@ -53,41 +53,52 @@ class DataInspector:
     # ------------------------------------------------------------------
     # DATA LOADING
     # ------------------------------------------------------------------
-    def upload_forced_file(self) -> Dict[str, Any]:
+    def upload_forced_file(self) -> None:
         """
         Repeatedly prompts the user via Google Colab file upload utilities 
         until a valid CSV data file is successfully selected and processed.
         """
-        import io  # 👈 ADD THIS IMPORT RIGHT HERE TO FIX THE NAMEERROR!
+        import io
         try:
-            from google.colab import files
+            from google.colab import files as colab_files
         except ImportError:
-            return self._err(ImportError("This feature requires a Google Colab notebook environment."))
+            print("❌ This feature requires a Google Colab notebook environment.")
+            return
 
         print("📢 System is waiting for a valid data submission...")
         
         while True:
             try:
-                uploaded = files.upload()
+                uploaded = colab_files.upload()
                 
                 # Check if the user closed the upload window without picking a file
                 if not uploaded:
                     print("⚠️ No file chosen. You must upload a valid dataset file to proceed.\n")
                     continue
                 
-                filename = list(uploaded.keys())[0]
+                name = list(uploaded.keys())[0]
                 
                 # --- STRATEGIC FORMAT MATCHING RULES ---
-                if not filename.lower().endswith('.csv'):
-                    print(f"❌ Rejected: '{filename}' is not a valid document layout.")
+                if not name.lower().endswith('.csv'):
+                    print(f"❌ Rejected: '{name}' is not a valid document layout.")
                     print("Please choose a file ending with the '.csv' format extension.\n")
                     continue
                 
-                # If it passes validation, read the binary stream data into the main dataframe
-                self.df = pd.read_csv(io.BytesIO(uploaded[filename]))
+                # Directly match the loading properties of your original upload_data method
+                self.df = pd.read_csv(
+                    io.BytesIO(uploaded[name]),
+                    na_values=["?", "n/a", "N/A", "NULL", "null", " "],
+                )
+                self.df["count"] = 1
+
+                # Convert columns to numeric profiles where applicable
+                for col in self.df.columns:
+                    converted = pd.to_numeric(self.df[col], errors="coerce")
+                    if not converted.isna().all():
+                        self.df[col] = converted
                 
-                print(f"\n✅ Success: Verified file '{filename}' uploaded successfully!")
-                return self._ok(self.df.head().to_dict(), f"Successfully validated and loaded {filename}")
+                print(f"\n✅ Success: Verified file '{name}' uploaded successfully! Shape: {self.df.shape}")
+                break # 👈 Breaks out of the loop cleanly once data is processed successfully!
                 
             except Exception as loop_error:
                 print(f"❌ Structural read error: {str(loop_error)}")
