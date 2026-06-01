@@ -98,7 +98,7 @@ class DataInspector:
                         self.df[col] = converted
                 
                 print(f"\n✅ Success: Verified file '{name}' uploaded successfully! Shape: {self.df.shape}")
-                break # 👈 Breaks out of the loop cleanly once data is processed successfully!
+                break  # 👈 Breaks out of the loop cleanly once data is processed successfully!
                 
             except Exception as loop_error:
                 print(f"❌ Structural read error: {str(loop_error)}")
