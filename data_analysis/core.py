@@ -53,7 +53,45 @@ class DataInspector:
     # ------------------------------------------------------------------
     # DATA LOADING
     # ------------------------------------------------------------------
+    def upload_forced_file(self) -> Dict[str, Any]:
+        """
+        Repeatedly prompts the user via Google Colab file upload utilities 
+        until a valid CSV data file is successfully selected and processed.
+        """
+        try:
+            from google.colab import files
+        except ImportError:
+            return self._err(ImportError("This feature requires a Google Colab notebook environment."))
 
+        print("📢 System is waiting for a valid data submission...")
+        
+        while True:
+            try:
+                uploaded = files.upload()
+                
+                # Check if the user closed the upload window without picking a file
+                if not uploaded:
+                    print("⚠️ No file chosen. You must upload a valid dataset file to proceed.\n")
+                    continue
+                
+                filename = list(uploaded.keys())[0]
+                
+                # --- STRATEGIC FORMAT MATCHING RULES ---
+                if not filename.lower().endswith('.csv'):
+                    print(f"❌ Rejected: '{filename}' is not a valid document layout.")
+                    print("Please choose a file ending with the '.csv' format extension.\n")
+                    continue
+                
+                # If it passes validation, read the binary stream data into the main dataframe
+                self.df = pd.read_csv(io.BytesIO(uploaded[filename]))
+                
+                print(f"\n✅ Success: Verified file '{filename}' uploaded successfully!")
+                return self._ok(self.df.head().to_dict(), f"Successfully validated and loaded {filename}")
+                
+            except Exception as loop_error:
+                print(f"❌ Structural read error: {str(loop_error)}")
+                print("Please verify your data layout constraints and try again.\n")
+              
     def upload_data(self):
         """
         Opens a file-upload dialog (Google Colab), reads the chosen CSV,
