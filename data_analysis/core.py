@@ -225,20 +225,29 @@ class DataInspector:
 
     def handle_missing_values(self, strategy: str = "median", columns: Optional[List[str]] = None) -> None:
         """
-        Safely imputes missing records using median, mean, mode, or drops missing records.
+        Safely imputes missing records. If a user uploads any arbitrary dataset,
+        this will automatically filter out valid columns or fallback to processing 
+        all columns so that it never crashes.
         """
         if self.df is None:
             print("❌ No dataset loaded yet.")
             return
 
-        # Fallback to all columns if none specified
-        target_cols = columns if columns else list(self.df.columns)
-        
+        # 1. SMART AUTO-DETECTION: 
+        # If columns are specified, only keep the ones that actually exist in the uploaded file.
+        if columns:
+            target_cols = [col for col in columns if col in self.df.columns]
+            if not target_cols:
+                print(f"⚠️ None of the requested columns {columns} were found. Falling back to all columns.")
+                target_cols = list(self.df.columns)
+        else:
+            # If no columns are provided, automatically target all columns
+            target_cols = list(self.df.columns)
+
+        # Remove internal utility tracking columns if they exist
+        target_cols = [c for c in target_cols if c != "count"]
+
         for col in target_cols:
-            if col not in self.df.columns:
-                print(f"⚠️ Warning: Column '{col}' not found in dataset. Skipping.")
-                continue
-                
             null_count = self.df[col].isnull().sum()
             if null_count == 0:
                 continue
@@ -249,44 +258,44 @@ class DataInspector:
                 self.df[col] = self.df[col].fillna(self.df[col].mean())
             elif strategy == "median" and pd.api.types.is_numeric_dtype(self.df[col]):
                 self.df[col] = self.df[col].fillna(self.df[col].median())
-            elif strategy == "mode":
+            elif strategy == "mode" or not pd.api.types.is_numeric_dtype(self.df[col]):
                 mode_val = self.df[col].mode()
                 if not mode_val.empty:
                     self.df[col] = self.df[col].fillna(mode_val[0])
                     
-        print(f"✅ Handled missing values using '{strategy}' strategy for columns: {target_cols}")
+        print(f"✅ Successfully handled missing values using '{strategy}' strategy for valid columns.")
 
     def handle_outliers(self, find_and_delete: bool = True, strategy: str = "remove", columns: Optional[List[str]] = None) -> None:
         """
-        Filters distribution outliers using robust Interquartile Range (IQR) criteria rules.
-        Supports both 'find_and_delete=True' and standard 'strategy' parameters.
+        Filters distribution outliers using robust Interquartile Range (IQR).
+        Automatically skips non-existent or categorical columns to prevent errors on any dataset.
         """
         if self.df is None:
             print("❌ No dataset loaded yet.")
             return
 
-        target_cols = columns if columns else list(self.df.select_dtypes(include=[np.number]).columns)
-        initial_shape = self.df.shape
-        
-        # Eliminate 'count' column if your package creates it automatically
+        # 2. SMART AUTO-DETECTION FOR OUTLIERS:
+        # Filter down to only columns that exist AND are numeric.
+        if columns:
+            target_cols = [col for col in columns if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col])]
+            if not target_cols:
+                print("⚠️ No valid numeric columns found from input list. Auto-selecting all numeric features.")
+                target_cols = list(self.df.select_dtypes(include=[np.number]).columns)
+        else:
+            target_cols = list(self.df.select_dtypes(include=[np.number]).columns)
+
         target_cols = [c for c in target_cols if c != "count"]
+        initial_shape = self.df.shape
 
         for col in target_cols:
-            if col not in self.df.columns:
-                print(f"⚠️ Warning: Column '{col}' not found for outlier detection. Skipping.")
-                continue
-            if not pd.api.types.is_numeric_dtype(self.df[col]):
-                continue
-                
             Q1 = self.df[col].quantile(0.25)
             Q3 = self.df[col].quantile(0.75)
             IQR = Q3 - Q1
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
             
-            # Execute filtration if strategy demands removal or find_and_delete is raised
-            if strategy == "remove" or find_and_delete:
-                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+            # Filter rows dynamically
+            self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
                 
         print(f"✅ Outliers processed. Rows before: {initial_shape[0]} -> Rows after: {self.df.shape[0]}")
 
