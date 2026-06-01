@@ -1554,7 +1554,7 @@ class PlottingMethods:
         try:
             df = self._parse_data(data)
             if df.empty:
-                return self._err("No data records found.")
+                return {"status": "error", "response": {"message": "No data records found.", "data": None}}
             if xLabel not in df.columns:
                 raise KeyError(f"x-axis column '{xLabel}' not found.")
 
@@ -1587,14 +1587,20 @@ class PlottingMethods:
                 legend=dict(font=dict(size=10), orientation="h", x=0.5, xanchor="center", y=1.02),
             )
             
-            # --- FIXED CLOSING LAYER CONFIGURATION ---
-            # Convert the interactive figure to standard serializable HTML markup 
-            # so that display_image() can parse and render it successfully in Colab.
-            html_payload = {"figure": fig.to_html(include_plotlyjs='cdn', full_html=False)}
-            return self._ok(html_payload, "Multi-column bar chart plotted")
+            # --- SELF-CONTAINED RESPONSE DICTIONARY FORMATTING ---
+            # Explicitly layout the exact status payload that display_image() looks for
+            return {
+                "status": "success",
+                "response": {
+                    "message": "Multi-column bar chart plotted successfully",
+                    "data": {
+                        "figure": fig.to_html(include_plotlyjs='cdn', full_html=False)
+                    }
+                }
+            }
             
         except Exception as exc:
-            return self._err(exc)
+            return {"status": "error", "response": {"message": str(exc), "data": None}}
 
     def plot_flow_chart_plotly(
         self,
