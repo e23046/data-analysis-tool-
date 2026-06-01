@@ -44,7 +44,7 @@ dependencies = [
     "plotly>=5.13",
     "networkx>=3.0",
     "statsmodels>=0.14",
-    "ipython>=8.0",
+    "ipython",
 ]
 
 [project.optional-dependencies]
