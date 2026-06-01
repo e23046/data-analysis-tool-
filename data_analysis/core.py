@@ -58,6 +58,7 @@ class DataInspector:
         Repeatedly prompts the user via Google Colab file upload utilities 
         until a valid CSV data file is successfully selected and processed.
         """
+        import io  # 👈 ADD THIS IMPORT RIGHT HERE TO FIX THE NAMEERROR!
         try:
             from google.colab import files
         except ImportError:
